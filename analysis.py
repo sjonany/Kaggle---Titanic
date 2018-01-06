@@ -1,7 +1,12 @@
 """
 Analysis code for titanic dataset.
 """
+# Data wrangling
 import pandas as pd
+
+# Visualization
+import seaborn as sea
+import matplotlib.pyplot as plt
 
 TRAIN_PATH = "data/train.csv"
 TEST_PATH = "data/test.csv"
@@ -34,3 +39,25 @@ train_df[['Sex', 'Survived']] \
     .mean() \
     .sort_values(by='Survived', ascending=False)
 
+# Plot histogram
+g = sea.FacetGrid(train_df, col='Survived')
+g.map(plt.hist, 'Age', bins=20)
+
+# Break histogram down with another dimension.
+g = sea.FacetGrid(train_df, row='Pclass', col='Survived')
+# Alpha = transparency
+g.map(plt.hist, 'Age', alpha=.5, bins=20)
+
+# Point plot. Show survival rate for [embarkations, pclass, gender]
+# This means there's a chart / row per embarkation
+g = sea.FacetGrid(train_df, row = 'Embarked')
+# x = Pclass, y = Survived, breakdown = Sex
+# Without palette, the color difference is not that striking
+g.map(sea.pointplot, 'Pclass', 'Survived', 'Sex', palette='deep')
+# So the gender legend shows up
+g.add_legend()
+
+# Bar chart.
+g = sea.FacetGrid(train_df, row='Embarked', col='Survived')
+# If ci (confidence interval) exists, there is a vertical line on every bar.
+g.map(sea.barplot, 'Sex', 'Fare', alpha=.5, ci=None)
