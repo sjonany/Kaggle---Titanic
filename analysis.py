@@ -1,10 +1,6 @@
-# -*- coding: utf-8 -*-
 """
-Spyder Editor
-
-This is a temporary script file.
+Analysis code for titanic dataset.
 """
-
 import pandas as pd
 
 TRAIN_PATH = "data/train.csv"
