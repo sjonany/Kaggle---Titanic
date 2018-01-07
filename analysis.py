@@ -6,10 +6,11 @@ Analysis code for titanic dataset.
 import pandas as pd
 
 # Visualization
-import seaborn as sea
 import matplotlib.pyplot as plt
+import seaborn as sea
 
 # Machine learning
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 
 TRAIN_PATH = "data/train.csv"
@@ -196,6 +197,18 @@ def train_svm_model(features, labels):
     svc.fit(features, labels)
     return svc
 
+def train_forest_model(features, labels):
+    """
+    Generate random forest model.
+    @param features (DataFrame) - Training features
+    @param labels (1d DataFrame) - Training labels
+    @return model (SVC) - the trained svm model
+    """
+    # TODO: search the parameters.
+    random_forest = RandomForestClassifier(n_estimators=100)
+    random_forest.fit(features, labels)
+    return random_forest
+
 """
 Main
 """
@@ -204,9 +217,7 @@ raw_test_df = pd.read_csv(TEST_PATH)
 train_df = raw_train_df.copy()
 test_df = raw_test_df.copy()
 
-print("Before updateFeatures {0}".format(train_df.shape))
 update_features(raw_train_df, train_df)
-print("After updateFeatures {0}".format(train_df.shape))
 update_features(raw_train_df, test_df)
 
 train_features = train_df.drop(columns='Survived')
@@ -214,6 +225,18 @@ train_label = train_df["Survived"]
 
 # Generate models
 svm_model = train_svm_model(train_features, train_label)
+forest_model = train_forest_model(train_features, train_label)
 
-# Evaluate model against training set.
-acc_svc = svm_model.score(train_features, train_label)
+# Evaluate against training set
+models = {
+        "SVM": svm_model,
+        "Random forest": forest_model
+        }
+
+model_scores = {}
+for model in models:
+    model_scores[model] = models[model].score(train_features, train_label)
+
+desc_score_models = sorted(model_scores, key=model_scores.get, reverse=True)
+for model in desc_score_models:
+    print(model, model_scores[model])
