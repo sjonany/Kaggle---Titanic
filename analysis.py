@@ -9,6 +9,9 @@ import pandas as pd
 import seaborn as sea
 import matplotlib.pyplot as plt
 
+# Machine learning
+from sklearn.svm import SVC
+
 TRAIN_PATH = "data/train.csv"
 TEST_PATH = "data/test.csv"
 
@@ -126,6 +129,7 @@ def add_age_group(df):
     df.loc[df['Age'] <= 16, 'AgeGroup'] = "kids (<=16)"
     df.loc[(df['Age'] > 16) & (df['Age'] <= 50), 'AgeGroup'] = "adults (>16,<= 50)"
     df.loc[df['Age'] > 50, 'AgeGroup'] = "elderly (>50)"
+    df['AgeGroup'] = df['AgeGroup'].astype('category')
 
 def add_title(df):
     df['Title'] = df['Name'].str.extract('([A-Za-z]+)\.', expand=False)
@@ -136,6 +140,7 @@ def add_title(df):
     df['Title'] = df['Title'].replace('Mme', 'Mrs')
     df['Title'] = df['Title'].replace(['Lady', 'Countess','Capt', 'Col',\
       'Don', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
+    df['Title'] = df['Title'].astype('category')
 
 def add_is_alone(df):
     family_size_lst = df['SibSp'] + df['Parch'] + 1
@@ -158,10 +163,38 @@ def update_features(src_df, dst_df):
     add_age_group(dst_df)
     add_title(dst_df)
     add_is_alone(dst_df)
+    dst_df['Pclass'] = dst_df['Pclass'].astype('category')
+    dst_df['Embarked'] = dst_df['Embarked'].astype('category')
+    dst_df['Sex'] = dst_df['Sex'].astype('category')
     
     # Drop useless features
-    dst_df.drop(columns=['Age', 'Cabin', 'Name', 'Parch', 'PassengerId',
-                          'SibSp','Ticket'], inplace=True)
+    dst_df.drop(columns=['Age', 'Cabin', 'Name', 'Parch',
+                         'PassengerId', 'SibSp','Ticket'], inplace=True)
+    numerize_categories(dst_df)
+
+def numerize_categories(df):    
+    """
+    Convert all categorical columns to their codes.
+    Some learning models hate strings.
+    @param df (DataFrame).
+    """
+    cat_columns = df.select_dtypes(['category']).columns
+    df[cat_columns] = df[cat_columns].apply(lambda x: x.cat.codes)
+
+
+#####################
+# Models
+def train_svm_model(features, labels):
+    """
+    Generate SVM model.
+    @param features (DataFrame) - Training features
+    @param labels (1d DataFrame) - Training labels
+    @return model (SVC) - the trained svm model
+    """
+    # TODO: do cross validation.
+    svc = SVC()
+    svc.fit(features, labels)
+    return svc
 
 """
 Main
@@ -170,7 +203,17 @@ raw_train_df = pd.read_csv(TRAIN_PATH)
 raw_test_df = pd.read_csv(TEST_PATH)
 train_df = raw_train_df.copy()
 test_df = raw_test_df.copy()
+
 print("Before updateFeatures {0}".format(train_df.shape))
 update_features(raw_train_df, train_df)
 print("After updateFeatures {0}".format(train_df.shape))
 update_features(raw_train_df, test_df)
+
+train_features = train_df.drop(columns='Survived')
+train_label = train_df["Survived"]
+
+# Generate models
+svm_model = train_svm_model(train_features, train_label)
+
+# Evaluate model against training set.
+acc_svc = svm_model.score(train_features, train_label)
