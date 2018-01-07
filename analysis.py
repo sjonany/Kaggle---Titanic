@@ -17,7 +17,7 @@ test_df = pd.read_csv(TEST_PATH)
 
 #####################
 # Understand the data
-print("The column names are %s" % (train_df.columns.values))
+print("The column names are {0}" % (train_df.columns.values))
 # See first few rows.
 train_df.head()
 # Schema of the dataframe
@@ -62,3 +62,67 @@ g.add_legend()
 g = sea.FacetGrid(train_df, row='Embarked', col='Survived')
 # If ci (confidence interval) exists, there is a vertical line on every bar.
 g.map(sea.barplot, 'Sex', 'Fare', alpha=.5, ci=None)
+
+#####################
+# Data wrangling
+
+
+def impute_age(df):
+    """
+    Impute missing age values.
+    @param df (DataFrame)
+    @return (DataFrame) the modified dataframe.
+    """
+    
+    # Impute age based on the median age in the [Sex, Pclass] group
+    for sex in df['Sex'].unique():
+        for pclass in df['Pclass'].unique():
+            # The bitwise operator (instead of 'and') is actually required.
+            # https://stackoverflow.com/a/36922103
+            guess_age =  \
+                df[(df['Sex'] == sex) & \
+                   (df['Pclass'] == pclass)]['Age'].dropna().median()
+            df.loc[df['Age'].isnull() & \
+                   (df.Sex == sex) & \
+                   (df.Pclass == pclass),\
+                 'Age'] = guess_age
+    return df
+
+def update_features(df):
+    """
+    Drop, add, modify columns. To be applied on both training and test set.
+    @param df (DataFrame)
+    @return (DataFrame) the modified dataframe.
+
+    """
+    # Impute missing values
+    df = impute_age(df)
+    
+    # Replace age with age group.
+    df.loc[df['Age'] <= 16, 'AgeGroup'] = "kids (<=16)"
+    df.loc[(df['Age'] > 16) & (df['Age'] <= 50), 'AgeGroup'] = "adults (>16,<= 50)"
+    df.loc[df['Age'] > 50, 'AgeGroup'] = "elderly (>50)"
+    
+    # Add title column
+    # See https://pandas.pydata.org/pandas-docs/stable/text.html
+    # expand=False so it will return Index, not dataframe
+    df['Title'] = df['Name'].str.extract('([A-Za-z]+)\.', expand=False)
+    df['Title'] = df['Title'].replace(['Lady', 'Countess','Capt', 'Col',\
+ 	'Don', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
+    df['Title'] = df['Title'].replace('Mlle', 'Miss')
+    df['Title'] = df['Title'].replace('Ms', 'Miss')
+    df['Title'] = df['Title'].replace('Mme', 'Mrs')
+    df['Title'] = df['Title'].replace(['Lady', 'Countess','Capt', 'Col',\
+      'Don', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
+    
+    # Drop useless features
+    df = df.drop(columns=['Ticket', 'Cabin', 'PassengerId', 'Name', 'Age'])
+    return df
+
+# Drop features
+print("Before updateFeatures {0}".format(train_df.shape))
+train_df = update_features(train_df)
+print("After updateFeatures {0}".format(train_df.shape))
+# Tally with group-by.
+pd.crosstab(train_df['Title'], train_df['Sex'])
+# To groupby-count one column: train_df.groupby('AgeGroup')['AgeGroup'].count()
