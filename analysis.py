@@ -85,51 +85,49 @@ def printPrelimAnalysis(df):
 
 #####################
 # Data wrangling
-def impute_age(df):
+def impute_age(src_df, dst_df):
     """
     Impute missing age values.
-    @param df (DataFrame)
-    @return (DataFrame) the modified dataframe.
+    @param src_df (DataFrame). The data frame to gather statistics from.
+    @return dst_df(DataFrame) The data frames to modify.
     """
-    
     # Impute age based on the median age in the [Sex, Pclass] group
-    for sex in df['Sex'].unique():
-        for pclass in df['Pclass'].unique():
+    for sex in src_df['Sex'].unique():
+        for pclass in src_df['Pclass'].unique():
             # The bitwise operator (instead of 'and') is actually required.
             # https://stackoverflow.com/a/36922103
             guess_age =  \
-                df[(df['Sex'] == sex) & \
-                   (df['Pclass'] == pclass)]['Age'].dropna().median()
-            df.loc[df['Age'].isnull() & \
-                   (df.Sex == sex) & \
-                   (df.Pclass == pclass),\
-                 'Age'] = guess_age
-    return df
+                src_df[(src_df['Sex'] == sex) & \
+                   (src_df['Pclass'] == pclass)]['Age'].dropna().median()
+            dst_df.loc[dst_df['Age'].isnull() & \
+               (dst_df.Sex == sex) & \
+               (dst_df.Pclass == pclass),\
+             'Age'] = guess_age
 
-def impute_embarked(df):
-    freq_port = df.Embarked.dropna().mode()[0]
-    df['Embarked'] = df['Embarked'].fillna(freq_port)
-    return df
-    
-def update_features(df):
+def impute_embarked(src_df, dst_df):
     """
-    Drop, add, modify columns. To be applied on both training and test set.
-    @param df (DataFrame)
-    @return (DataFrame) the modified dataframe.
+    Impute missing embarkation values.
+    @param src_df (DataFrame). The data frame to gather statistics from.
+    @return dst_df (DataFrame) The data frames to modify.
+    """
+    freq_port = src_df.Embarked.dropna().mode()[0]
+    dst_df['Embarked'].fillna(freq_port, inplace=True)
 
+def impute_fare(src_df, dst_df):
     """
-    # Impute missing values
-    df = impute_age(df)
-    df = impute_embarked(df)
-    
-    # Replace age with age group.
+    Impute missing fare values.
+    The train set is complete, but test set has 1 missing value.
+    @param src_df (DataFrame). The data frame to gather statistics from.
+    @return dst_df (DataFrame) The data frames to modify.
+    """
+    dst_df['Fare'].fillna(src_df['Fare'].dropna().median(), inplace=True)
+
+def add_age_group(df):
     df.loc[df['Age'] <= 16, 'AgeGroup'] = "kids (<=16)"
     df.loc[(df['Age'] > 16) & (df['Age'] <= 50), 'AgeGroup'] = "adults (>16,<= 50)"
     df.loc[df['Age'] > 50, 'AgeGroup'] = "elderly (>50)"
-    
-    # Add title column
-    # See https://pandas.pydata.org/pandas-docs/stable/text.html
-    # expand=False so it will return Index, not dataframe
+
+def add_title(df):
     df['Title'] = df['Name'].str.extract('([A-Za-z]+)\.', expand=False)
     df['Title'] = df['Title'].replace(['Lady', 'Countess','Capt', 'Col',\
  	'Don', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
@@ -138,22 +136,41 @@ def update_features(df):
     df['Title'] = df['Title'].replace('Mme', 'Mrs')
     df['Title'] = df['Title'].replace(['Lady', 'Countess','Capt', 'Col',\
       'Don', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
-    
-    # Add IsAlone as a feature
+
+def add_is_alone(df):
     family_size_lst = df['SibSp'] + df['Parch'] + 1
     df['IsAlone'] = 0
     df.loc[family_size_lst == 1, 'IsAlone'] = 1
     
+def update_features(src_df, dst_df):
+    """
+    Drop, add, modify columns. To be applied on both training and test set.
+    @param src_df (DataFrame). The data frame to gather statistics from.
+    @param dst_df (DataFrame) The data frames to modify.
+
+    """
+    # Impute missing values
+    impute_age(src_df, dst_df)
+    impute_embarked(src_df, dst_df)
+    impute_fare(src_df, dst_df)
+    
+    # Add columns
+    add_age_group(dst_df)
+    add_title(dst_df)
+    add_is_alone(dst_df)
+    
     # Drop useless features
-    df = df.drop(columns=['Age', 'Cabin', 'Name', 'Parch', 'PassengerId',
-                          'SibSp','Ticket'])
-    return df
+    dst_df.drop(columns=['Age', 'Cabin', 'Name', 'Parch', 'PassengerId',
+                          'SibSp','Ticket'], inplace=True)
 
 """
 Main
 """
-train_df = pd.read_csv(TRAIN_PATH)
-test_df = pd.read_csv(TEST_PATH)
+raw_train_df = pd.read_csv(TRAIN_PATH)
+raw_test_df = pd.read_csv(TEST_PATH)
+train_df = raw_train_df.copy()
+test_df = raw_test_df.copy()
 print("Before updateFeatures {0}".format(train_df.shape))
-train_df = update_features(train_df)
+update_features(raw_train_df, train_df)
 print("After updateFeatures {0}".format(train_df.shape))
+update_features(raw_train_df, test_df)
