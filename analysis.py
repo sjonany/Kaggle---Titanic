@@ -106,6 +106,11 @@ def impute_age(df):
                  'Age'] = guess_age
     return df
 
+def impute_embarked(df):
+    freq_port = df.Embarked.dropna().mode()[0]
+    df['Embarked'] = df['Embarked'].fillna(freq_port)
+    return df
+    
 def update_features(df):
     """
     Drop, add, modify columns. To be applied on both training and test set.
@@ -115,6 +120,7 @@ def update_features(df):
     """
     # Impute missing values
     df = impute_age(df)
+    df = impute_embarked(df)
     
     # Replace age with age group.
     df.loc[df['Age'] <= 16, 'AgeGroup'] = "kids (<=16)"
