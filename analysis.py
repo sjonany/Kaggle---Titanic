@@ -11,10 +11,12 @@ import seaborn as sea
 
 # Machine learning
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold
 from sklearn.svm import SVC
 
 TRAIN_PATH = "data/train.csv"
 TEST_PATH = "data/test.csv"
+KFOLD = 5
 
 #####################
 # Analysis tools
@@ -182,33 +184,6 @@ def numerize_categories(df):
     cat_columns = df.select_dtypes(['category']).columns
     df[cat_columns] = df[cat_columns].apply(lambda x: x.cat.codes)
 
-
-#####################
-# Models
-def train_svm_model(features, labels):
-    """
-    Generate SVM model.
-    @param features (DataFrame) - Training features
-    @param labels (1d DataFrame) - Training labels
-    @return model (SVC) - the trained svm model
-    """
-    # TODO: do cross validation.
-    svc = SVC()
-    svc.fit(features, labels)
-    return svc
-
-def train_forest_model(features, labels):
-    """
-    Generate random forest model.
-    @param features (DataFrame) - Training features
-    @param labels (1d DataFrame) - Training labels
-    @return model (SVC) - the trained svm model
-    """
-    # TODO: search the parameters.
-    random_forest = RandomForestClassifier(n_estimators=100)
-    random_forest.fit(features, labels)
-    return random_forest
-
 """
 Main
 """
@@ -224,18 +199,23 @@ train_features = train_df.drop(columns='Survived')
 train_label = train_df["Survived"]
 
 # Generate models
-svm_model = train_svm_model(train_features, train_label)
-forest_model = train_forest_model(train_features, train_label)
-
-# Evaluate against training set
+kfold = StratifiedKFold(n_splits=KFOLD)
 models = {
-        "SVM": svm_model,
-        "Random forest": forest_model
+        "SVM": SVC(),
+        "Random forest": RandomForestClassifier(n_estimators=100)
         }
 
 model_scores = {}
-for model in models:
-    model_scores[model] = models[model].score(train_features, train_label)
+for model_name in models:
+    total_score = 0
+    for train_index, test_index in kfold.split(train_features, train_label):
+        x_train = train_features.iloc[train_index,:]
+        x_test = train_features.iloc[test_index,:]
+        y_train = train_label.iloc[train_index]
+        y_test = train_label.iloc[test_index]
+        models[model_name].fit(x_train, y_train)
+        total_score += models[model_name].score(x_test, y_test)
+    model_scores[model_name] = total_score / KFOLD
 
 desc_score_models = sorted(model_scores, key=model_scores.get, reverse=True)
 for model in desc_score_models:
