@@ -11,12 +11,12 @@ import seaborn as sea
 
 # Machine learning
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
 
 TRAIN_PATH = "data/train.csv"
 TEST_PATH = "data/test.csv"
-KFOLD = 5
+KFOLD = 10
 
 #####################
 # Analysis tools
@@ -37,7 +37,6 @@ def printDiscreteStats(df, colName):
 
 #####################
 # Understand the data
-
 def printPrelimAnalysis(df):
     """
     Preliminary analysis. Just visualizations before we wrangle anything.
@@ -184,6 +183,75 @@ def numerize_categories(df):
     cat_columns = df.select_dtypes(['category']).columns
     df[cat_columns] = df[cat_columns].apply(lambda x: x.cat.codes)
 
+#####################
+# Model generation and evalution
+
+def evaluate_models(models, nfold, features, labels):
+    """
+    Perform k-fold on models, 
+    Print K-fold accuracy for models.
+    @param nfold (int) k in kfold
+    @param models (Map<string, model>) Models to evaluate.
+    @param features, labels. X,Y of training set.
+    """
+    model_scores = {}
+    kfold = StratifiedKFold(n_splits=nfold)
+    for model_name in models:
+        total_score = 0
+        for train_index, test_index in kfold.split(features, labels):
+            x_train = features.iloc[train_index,:]
+            x_test = features.iloc[test_index,:]
+            y_train = labels.iloc[train_index]
+            y_test = labels.iloc[test_index]
+            models[model_name].fit(x_train, y_train)
+            cur_score = models[model_name].score(x_test, y_test)
+            total_score += cur_score
+            print("Model {0}. Acc {1}".format(model_name, cur_score))
+        model_scores[model_name] = total_score / nfold
+    
+    desc_score_models = sorted(model_scores, key=model_scores.get, reverse=True)
+    for model in desc_score_models:
+        print(model, model_scores[model])
+        
+def gen_models():
+    """
+    Create untrained models
+    
+    @return (Map<string, model>) Models to evaluate.
+    """
+    models = {
+        "SVM": SVC(),
+        # See grid_search_forest()
+        "Random forest": RandomForestClassifier(n_estimators=250,
+                                                max_features=7)
+        }
+    return models
+
+def grid_search_forest(features, labels):
+    """
+    Grid search on random forest to find the best hyperparams.
+    This is just an analysis tool.
+    With this hyperparam, add it to the models.
+    
+    Note: It is kind of cheating that we optimize the hyperparams based on
+    the same set we will later do kfold-evaluation on huh.
+
+    Jan 7, 2018
+    Out: Best parameters set found on development set:
+        {'max_features': 7, 'n_estimators': 250}
+    
+    @param models (Map<string, model>) Models to evaluate.
+    @param features, labels. X,Y of training set.
+    """
+    forest_params = {'n_estimators': [100, 250, 500,1000],
+                     'max_features': [3,5,7]}
+    cv_model = GridSearchCV(\
+                RandomForestClassifier(), forest_params, cv=5,\
+                       scoring='accuracy')
+    cv_model.fit(features, labels)
+    print("Best parameters set found on development set:")
+    print(cv_model.best_params_)
+
 """
 Main
 """
@@ -196,27 +264,8 @@ update_features(raw_train_df, train_df)
 update_features(raw_train_df, test_df)
 
 train_features = train_df.drop(columns='Survived')
-train_label = train_df["Survived"]
+train_labels = train_df["Survived"]
 
 # Generate models
-kfold = StratifiedKFold(n_splits=KFOLD)
-models = {
-        "SVM": SVC(),
-        "Random forest": RandomForestClassifier(n_estimators=100)
-        }
-
-model_scores = {}
-for model_name in models:
-    total_score = 0
-    for train_index, test_index in kfold.split(train_features, train_label):
-        x_train = train_features.iloc[train_index,:]
-        x_test = train_features.iloc[test_index,:]
-        y_train = train_label.iloc[train_index]
-        y_test = train_label.iloc[test_index]
-        models[model_name].fit(x_train, y_train)
-        total_score += models[model_name].score(x_test, y_test)
-    model_scores[model_name] = total_score / KFOLD
-
-desc_score_models = sorted(model_scores, key=model_scores.get, reverse=True)
-for model in desc_score_models:
-    print(model, model_scores[model])
+models = gen_models()
+evaluate_models(models, KFOLD, train_features, train_labels)
