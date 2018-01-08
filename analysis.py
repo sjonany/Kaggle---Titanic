@@ -269,3 +269,14 @@ train_labels = train_df["Survived"]
 # Generate models
 models = gen_models()
 evaluate_models(models, KFOLD, train_features, train_labels)
+
+# Final training and prediction
+final_model = models['Random forest']
+final_model.fit(train_features, train_labels)
+final_labels = final_model.predict(test_df)
+
+submission = pd.DataFrame({
+    "PassengerId": raw_test_df["PassengerId"],
+    "Survived": final_labels
+})
+submission.to_csv('output/submission.csv', index=False)
