@@ -99,15 +99,18 @@ def impute_age(src_df, dst_df):
     # Impute age based on the median age in the [Sex, Pclass] group
     for sex in src_df['Sex'].unique():
         for pclass in src_df['Pclass'].unique():
-            # The bitwise operator (instead of 'and') is actually required.
-            # https://stackoverflow.com/a/36922103
-            guess_age =  \
-                src_df[(src_df['Sex'] == sex) & \
-                   (src_df['Pclass'] == pclass)]['Age'].dropna().median()
-            dst_df.loc[dst_df['Age'].isnull() & \
-               (dst_df.Sex == sex) & \
-               (dst_df.Pclass == pclass),\
-             'Age'] = guess_age
+            for title in src_df['Title'].unique():
+                # The bitwise operator (instead of 'and') is actually required.
+                # https://stackoverflow.com/a/36922103
+                guess_age =  \
+                    src_df[(src_df['Sex'] == sex) & \
+                       (src_df['Pclass'] == pclass) & \
+                       (src_df['Title'] == title)]['Age'].dropna().median()
+                dst_df.loc[dst_df['Age'].isnull() & \
+                   (dst_df['Sex'] == sex) & \
+                   (dst_df['Pclass'] == pclass) & \
+                   (dst_df['Title'] == title),\
+                 'Age'] = guess_age
 
 def impute_embarked(src_df, dst_df):
     """
@@ -154,16 +157,14 @@ def update_features(src_df, dst_df):
     Drop, add, modify columns. To be applied on both training and test set.
     @param src_df (DataFrame). The data frame to gather statistics from.
     @param dst_df (DataFrame) The data frames to modify.
-
     """
-    # Impute missing values
-    impute_age(src_df, dst_df)
-    impute_embarked(src_df, dst_df)
-    impute_fare(src_df, dst_df)
-    
-    # Add columns
-    add_age_group(dst_df)
+    # Title needed for age imputation
+    add_title(src_df)
     add_title(dst_df)
+    impute_age(src_df, dst_df)
+    add_age_group(dst_df)
+    impute_embarked(src_df, dst_df)
+    impute_fare(src_df, dst_df)    
     add_is_alone(dst_df)
     dst_df['Pclass'] = dst_df['Pclass'].astype('category')
     dst_df['Embarked'] = dst_df['Embarked'].astype('category')
@@ -262,8 +263,8 @@ def write_submission(model, train_features, train_labels, test_features,
     @param test_features (DataFrame) - the test features to predict against
     @param passenger_ids (List<Int>) - The passenger ids
     """
-    final_model.fit(train_features, train_labels)
-    final_labels = final_model.predict(test_df)
+    model.fit(train_features, train_labels)
+    final_labels = model.predict(test_df)
     submission = pd.DataFrame({
             "PassengerId": passenger_ids,
             "Survived": final_labels
