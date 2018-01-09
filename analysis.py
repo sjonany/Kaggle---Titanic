@@ -157,6 +157,9 @@ def update_features(src_df, dst_df):
     Drop, add, modify columns. To be applied on both training and test set.
     @param src_df (DataFrame). The data frame to gather statistics from.
     @param dst_df (DataFrame) The data frames to modify.
+    @return dst_df The updated dst_df.
+    Side-effect - Will modify dst_df, but you have to reassign with the return
+    value. Idk how to select columns and mutate dst_df :/
     """
     # Title needed for age imputation
     add_title(src_df)
@@ -170,10 +173,18 @@ def update_features(src_df, dst_df):
     dst_df['Embarked'] = dst_df['Embarked'].astype('category')
     dst_df['Sex'] = dst_df['Sex'].astype('category')
     
-    # Drop useless features
-    dst_df.drop(columns=['Age', 'Cabin', 'Name', 'Parch',
-                         'PassengerId', 'SibSp','Ticket'], inplace=True)
+    # Select features
+    dst_df = dst_df[[
+            'AgeGroup',
+            'Embarked',
+            'Fare',
+            'IsAlone',
+            'Pclass',
+            'Sex',
+            'Title'
+            ]].copy()
     numerize_categories(dst_df)
+    return dst_df
 
 def numerize_categories(df):    
     """
@@ -264,7 +275,7 @@ def write_submission(model, train_features, train_labels, test_features,
     @param passenger_ids (List<Int>) - The passenger ids
     """
     model.fit(train_features, train_labels)
-    final_labels = model.predict(test_df)
+    final_labels = model.predict(test_features)
     submission = pd.DataFrame({
             "PassengerId": passenger_ids,
             "Survived": final_labels
@@ -279,11 +290,9 @@ raw_test_df = pd.read_csv(TEST_PATH)
 train_df = raw_train_df.copy()
 test_df = raw_test_df.copy()
 
-update_features(raw_train_df, train_df)
-update_features(raw_train_df, test_df)
-
-train_features = train_df.drop(columns='Survived')
-train_labels = train_df["Survived"]
+train_features = update_features(raw_train_df, train_df)
+test_features = update_features(raw_train_df, test_df)
+train_labels = raw_train_df["Survived"]
 
 # Generate models
 models = gen_models()
@@ -291,5 +300,5 @@ evaluate_models(models, KFOLD, train_features, train_labels)
 
 # Final training and prediction
 final_model = models['Random forest']
-write_submission(final_model, train_features, train_labels, test_df,
+write_submission(final_model, train_features, train_labels, test_features,
                  raw_test_df["PassengerId"])
