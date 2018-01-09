@@ -251,6 +251,24 @@ def grid_search_forest(features, labels):
     cv_model.fit(features, labels)
     print("Best parameters set found on development set:")
     print(cv_model.best_params_)
+    
+def write_submission(model, train_features, train_labels, test_features,
+                     passenger_ids): 
+    """
+    Write the final submission.
+    @param model (Model) - the best learning model to use
+    @param train_features (DataFrame) - the features to train model with
+    @param train_labels (DataFrame) - the labels to train model with
+    @param test_features (DataFrame) - the test features to predict against
+    @param passenger_ids (List<Int>) - The passenger ids
+    """
+    final_model.fit(train_features, train_labels)
+    final_labels = final_model.predict(test_df)
+    submission = pd.DataFrame({
+            "PassengerId": passenger_ids,
+            "Survived": final_labels
+            })
+    submission.to_csv('output/submission.csv', index=False)
 
 """
 Main
@@ -272,11 +290,5 @@ evaluate_models(models, KFOLD, train_features, train_labels)
 
 # Final training and prediction
 final_model = models['Random forest']
-final_model.fit(train_features, train_labels)
-final_labels = final_model.predict(test_df)
-
-submission = pd.DataFrame({
-    "PassengerId": raw_test_df["PassengerId"],
-    "Survived": final_labels
-})
-submission.to_csv('output/submission.csv', index=False)
+write_submission(final_model, train_features, train_labels, test_df,
+                 raw_test_df["PassengerId"])
