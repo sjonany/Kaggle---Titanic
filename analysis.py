@@ -253,8 +253,8 @@ def gen_models():
     models = {
         "SVM": SVC(),
         # See grid_search_forest()
-        "Random forest": RandomForestClassifier(n_estimators=250,
-                                                max_features=7)
+        "Random forest": RandomForestClassifier(n_estimators=25,
+                                                max_features=15)
         }
     return models
 
@@ -267,15 +267,15 @@ def grid_search_forest(features, labels):
     Note: It is kind of cheating that we optimize the hyperparams based on
     the same set we will later do kfold-evaluation on huh.
 
-    Jan 7, 2018
+    Jan 14, 2018
     Out: Best parameters set found on development set:
-        {'max_features': 7, 'n_estimators': 250}
+        {'max_features': 15, 'n_estimators': 25}
     
     @param models (Map<string, model>) Models to evaluate.
     @param features, labels. X,Y of training set.
     """
-    forest_params = {'n_estimators': [100, 250, 500,1000],
-                     'max_features': [3,5,7]}
+    forest_params = {'n_estimators': [5, 10, 25, 50],
+                     'max_features': [7,11,15]}
     cv_model = GridSearchCV(\
                 RandomForestClassifier(), forest_params, cv=5,\
                        scoring='accuracy')
@@ -315,6 +315,10 @@ train_labels = raw_train_df["Survived"]
 
 # Generate models
 models = gen_models()
+
+# Enable if you want to find hyper param.
+# grid_search_forest(train_features, train_labels)
+
 evaluate_models(models, KFOLD, train_features, train_labels)
 
 # Final training and prediction
