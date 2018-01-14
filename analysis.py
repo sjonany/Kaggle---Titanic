@@ -8,11 +8,13 @@ import pandas as pd
 # Visualization
 import matplotlib.pyplot as plt
 import seaborn as sea
+import sys
 
 # Machine learning
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 
 TRAIN_PATH = "data/train.csv"
 TEST_PATH = "data/test.csv"
@@ -42,7 +44,7 @@ def printPrelimAnalysis(df):
     Preliminary analysis. Just visualizations before we wrangle anything.
     @param df (dataframe)
     """
-    print("The column names are {0}" % (df.columns.values))
+    print("The column names are {0}".format(df.columns.values))
     # See first few rows.
     df.head()
     # Schema of the dataframe
@@ -87,6 +89,27 @@ def printPrelimAnalysis(df):
     g = sea.FacetGrid(df, row='Embarked', col='Survived')
     # If ci (confidence interval) exists, there is a vertical line on every bar.
     g.map(sea.barplot, 'Sex', 'Fare', alpha=.5, ci=None)
+
+"""
+Plot variable importance by training decisision tree.
+@param X (DataFrame). The feature set.
+@param y (DataFrame). The labels.
+"""
+def plot_variable_importance( X , y ):
+    max_num_features = 20
+    model = DecisionTreeClassifier()
+    model.fit( X , y )
+    imp = pd.DataFrame( 
+        model.feature_importances_  , 
+        columns = [ 'Importance' ] , 
+        index = X.columns 
+    )
+    imp = imp.sort_values( [ 'Importance' ] , ascending = True )
+    imp[ : max_num_features ].plot( kind = 'barh' )
+    print ("Tree model score on training set: {0}".format(
+            model.score( X , y )))
+    
+
 
 #####################
 # Data wrangling
@@ -253,7 +276,7 @@ def gen_models():
     models = {
         "SVM": SVC(),
         # See grid_search_forest()
-        "Random forest": RandomForestClassifier(n_estimators=25,
+        "Random forest": RandomForestClassifier(n_estimators=250,
                                                 max_features=15)
         }
     return models
@@ -313,11 +336,18 @@ train_features = onehot_categories(update_features(raw_train_df, train_df))
 test_features = onehot_categories(update_features(raw_train_df, test_df))
 train_labels = raw_train_df["Survived"]
 
+# Enable if you want to see variable importance
+plot_variable_importance(train_features, train_labels)
+sys.exit()
+
 # Generate models
 models = gen_models()
 
-# Enable if you want to find hyper param.
-# grid_search_forest(train_features, train_labels)
+# Enable if you want to tune hyperparams.
+"""
+grid_search_forest(train_features, train_labels)
+sys.exit()
+"""
 
 evaluate_models(models, KFOLD, train_features, train_labels)
 
