@@ -201,6 +201,7 @@ def update_features(src_df, dst_df):
     
     # Select features
     dst_df = dst_df[[
+            'Age',
             'AgeGroup',
             'Embarked',
             'Fare',
@@ -280,8 +281,8 @@ def gen_models():
     models = {
         "SVM": SVC(),
         # See grid_search_forest()
-        "Random forest": RandomForestClassifier(n_estimators=25,
-                                                max_features=13)
+        "Random forest": RandomForestClassifier(n_estimators=50,
+                                                max_features=7)
         }
     return models
 
@@ -296,13 +297,13 @@ def grid_search_forest(features, labels):
 
     Jan 14, 2018
     Out: Best parameters set found on development set:
-        {'max_features': 13, 'n_estimators': 25}
+        {'max_features': 7, 'n_estimators': 50}
     
     @param models (Map<string, model>) Models to evaluate.
     @param features, labels. X,Y of training set.
     """
-    forest_params = {'n_estimators': [10, 25, 50, 100],
-                     'max_features': [7,11,13]}
+    forest_params = {'n_estimators': [25, 50, 100, 250, 500],
+                     'max_features': [7,11,14]}
     cv_model = GridSearchCV(\
                 RandomForestClassifier(), forest_params, cv=5,\
                        scoring='accuracy')
