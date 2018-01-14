@@ -155,6 +155,9 @@ def add_is_alone(df):
 def update_features(src_df, dst_df):
     """
     Drop, add, modify columns. To be applied on both training and test set.
+    This form is not dependent on the learning model, and is also a friendly
+    format to do plots and analyses on, as the enums are in legible forms.
+    So, more processing like 'onehot_categories' might be needed.
     @param src_df (DataFrame). The data frame to gather statistics from.
     @param dst_df (DataFrame) The data frames to modify.
     @return dst_df The updated dst_df.
@@ -183,17 +186,33 @@ def update_features(src_df, dst_df):
             'Sex',
             'Title'
             ]].copy()
-    numerize_categories(dst_df)
     return dst_df
 
 def numerize_categories(df):    
     """
     Convert all categorical columns to their codes.
     Some learning models hate strings.
+    Note that some learning models do not handle enums, and you might have to
+    use 'onehot_categories()' instead.
     @param df (DataFrame).
     """
     cat_columns = df.select_dtypes(['category']).columns
     df[cat_columns] = df[cat_columns].apply(lambda x: x.cat.codes)
+    
+def onehot_categories(df):    
+    """
+    Apply one-hot encoding to all categorical columns.
+    Some sklearn models don't deal with categories.
+    E.g. As of Jan 2018, even random forest implementation converts enums
+      to floats. tps://github.com/scikit-learn/scikit-learn/pull/4899
+    @param df (DataFrame).
+    @return df new pd with categorical columns replaced with binaries.
+    """
+    cat_cols = df.select_dtypes(['category']).columns
+    dummied_cat_df = pd.get_dummies(df[cat_cols])
+    dummied_pd = pd.concat([df, dummied_cat_df], axis=1)
+    dummied_pd.drop(cat_cols, axis=1, inplace=True)
+    return dummied_pd
 
 #####################
 # Model generation and evalution
@@ -290,8 +309,8 @@ raw_test_df = pd.read_csv(TEST_PATH)
 train_df = raw_train_df.copy()
 test_df = raw_test_df.copy()
 
-train_features = update_features(raw_train_df, train_df)
-test_features = update_features(raw_train_df, test_df)
+train_features = onehot_categories(update_features(raw_train_df, train_df))
+test_features = onehot_categories(update_features(raw_train_df, test_df))
 train_labels = raw_train_df["Survived"]
 
 # Generate models
