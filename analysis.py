@@ -232,7 +232,11 @@ def onehot_categories(df):
     @return df new pd with categorical columns replaced with binaries.
     """
     cat_cols = df.select_dtypes(['category']).columns
-    dummied_cat_df = pd.get_dummies(df[cat_cols])
+    # drop_first to reduce number of dependent features. The last item can be
+    # inferred. We could do better by maybe not just dropping arbitrarily.
+    # E.g. keep the one that has the highest variable importance? Or drop the
+    # one with highest occurrence.
+    dummied_cat_df = pd.get_dummies(df[cat_cols], drop_first = True)
     dummied_pd = pd.concat([df, dummied_cat_df], axis=1)
     dummied_pd.drop(cat_cols, axis=1, inplace=True)
     return dummied_pd
@@ -276,8 +280,8 @@ def gen_models():
     models = {
         "SVM": SVC(),
         # See grid_search_forest()
-        "Random forest": RandomForestClassifier(n_estimators=250,
-                                                max_features=15)
+        "Random forest": RandomForestClassifier(n_estimators=25,
+                                                max_features=13)
         }
     return models
 
@@ -292,13 +296,13 @@ def grid_search_forest(features, labels):
 
     Jan 14, 2018
     Out: Best parameters set found on development set:
-        {'max_features': 15, 'n_estimators': 25}
+        {'max_features': 13, 'n_estimators': 25}
     
     @param models (Map<string, model>) Models to evaluate.
     @param features, labels. X,Y of training set.
     """
-    forest_params = {'n_estimators': [5, 10, 25, 50],
-                     'max_features': [7,11,15]}
+    forest_params = {'n_estimators': [10, 25, 50, 100],
+                     'max_features': [7,11,13]}
     cv_model = GridSearchCV(\
                 RandomForestClassifier(), forest_params, cv=5,\
                        scoring='accuracy')
@@ -337,8 +341,10 @@ test_features = onehot_categories(update_features(raw_train_df, test_df))
 train_labels = raw_train_df["Survived"]
 
 # Enable if you want to see variable importance
+"""
 plot_variable_importance(train_features, train_labels)
 sys.exit()
+"""
 
 # Generate models
 models = gen_models()
