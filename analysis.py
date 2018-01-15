@@ -11,7 +11,8 @@ import seaborn as sea
 import sys
 
 # Machine learning
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
@@ -282,7 +283,7 @@ def gen_models():
         "SVM": SVC(),
         # See grid_search_forest()
         "Random forest": RandomForestClassifier(n_estimators=50,
-                                                max_features=7)
+                                                max_features=2)
         }
     return models
 
@@ -297,13 +298,13 @@ def grid_search_forest(features, labels):
 
     Jan 14, 2018
     Out: Best parameters set found on development set:
-        {'max_features': 7, 'n_estimators': 50}
+        {'max_features': 2, 'n_estimators': 50}
     
     @param models (Map<string, model>) Models to evaluate.
     @param features, labels. X,Y of training set.
     """
     forest_params = {'n_estimators': [25, 50, 100, 250, 500],
-                     'max_features': [7,11,14]}
+                     'max_features': [2,3,5]}
     cv_model = GridSearchCV(\
                 RandomForestClassifier(), forest_params, cv=5,\
                        scoring='accuracy')
@@ -337,13 +338,23 @@ raw_test_df = pd.read_csv(TEST_PATH)
 train_df = raw_train_df.copy()
 test_df = raw_test_df.copy()
 
-train_features = onehot_categories(update_features(raw_train_df, train_df))
-test_features = onehot_categories(update_features(raw_train_df, test_df))
+train_features = onehot_categories(
+        update_features(raw_train_df, train_df))
+test_features = onehot_categories(
+        update_features(raw_train_df, test_df))
 train_labels = raw_train_df["Survived"]
+
+# Auto feature selection
+clf = ExtraTreesClassifier()
+clf = clf.fit(train_features, train_labels)
+feature_select_model = SelectFromModel(clf, prefit=True)
+reduced_cols = train_features.columns[feature_select_model.get_support()]
+train_reduced_features = train_features[reduced_cols]
+test_reduced_features = test_features[reduced_cols]
 
 # Enable if you want to see variable importance
 """
-plot_variable_importance(train_features, train_labels)
+plot_variable_importance(train_reduced_features, train_labels)
 sys.exit()
 """
 
@@ -352,13 +363,13 @@ models = gen_models()
 
 # Enable if you want to tune hyperparams.
 """
-grid_search_forest(train_features, train_labels)
+grid_search_forest(train_reduced_features, train_labels)
 sys.exit()
 """
 
-evaluate_models(models, KFOLD, train_features, train_labels)
+evaluate_models(models, KFOLD, train_reduced_features, train_labels)
 
 # Final training and prediction
 final_model = models['Random forest']
-write_submission(final_model, train_features, train_labels, test_features,
-                 raw_test_df["PassengerId"])
+write_submission(final_model, train_reduced_features, train_labels,
+                 test_reduced_features, raw_test_df["PassengerId"])
