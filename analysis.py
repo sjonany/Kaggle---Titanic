@@ -20,6 +20,7 @@ from sklearn.tree import DecisionTreeClassifier
 TRAIN_PATH = "data/train.csv"
 TEST_PATH = "data/test.csv"
 KFOLD = 10
+RANDOM_STATE = 123
 
 #####################
 # Analysis tools
@@ -255,7 +256,7 @@ def evaluate_models(models, nfold, features, labels):
     @param features, labels. X,Y of training set.
     """
     model_scores = {}
-    kfold = StratifiedKFold(n_splits=nfold)
+    kfold = StratifiedKFold(n_splits=nfold, random_state = RANDOM_STATE)
     for model_name in models:
         total_score = 0
         for train_index, test_index in kfold.split(features, labels):
@@ -280,10 +281,11 @@ def gen_models():
     @return (Map<string, model>) Models to evaluate.
     """
     models = {
-        "SVM": SVC(),
+        "SVM": SVC(random_state=RANDOM_STATE),
         # See grid_search_forest()
         "Random forest": RandomForestClassifier(n_estimators=50,
-                                                max_features=2)
+                                                max_features=2,
+                                                random_state=RANDOM_STATE)
         }
     return models
 
@@ -306,7 +308,8 @@ def grid_search_forest(features, labels):
     forest_params = {'n_estimators': [25, 50, 100, 250, 500],
                      'max_features': [2,3,5]}
     cv_model = GridSearchCV(\
-                RandomForestClassifier(), forest_params, cv=5,\
+                RandomForestClassifier( \
+                        random_state=RANDOM_STATE), forest_params, cv=5,\
                        scoring='accuracy')
     cv_model.fit(features, labels)
     print("Best parameters set found on development set:")
@@ -345,7 +348,7 @@ test_features = onehot_categories(
 train_labels = raw_train_df["Survived"]
 
 # Auto feature selection
-clf = ExtraTreesClassifier()
+clf = ExtraTreesClassifier(random_state=RANDOM_STATE)
 clf = clf.fit(train_features, train_labels)
 feature_select_model = SelectFromModel(clf, prefit=True)
 reduced_cols = train_features.columns[feature_select_model.get_support()]
