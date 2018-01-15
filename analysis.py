@@ -110,8 +110,6 @@ def plot_variable_importance( X , y ):
     imp[ : max_num_features ].plot( kind = 'barh' )
     print ("Tree model score on training set: {0}".format(
             model.score( X , y )))
-    
-
 
 #####################
 # Data wrangling
@@ -156,10 +154,10 @@ def impute_fare(src_df, dst_df):
     dst_df['Fare'].fillna(src_df['Fare'].dropna().median(), inplace=True)
 
 def add_age_group(df):
-    df.loc[df['Age'] <= 16, 'AgeGroup'] = "kids (<=16)"
-    df.loc[(df['Age'] > 16) & (df['Age'] <= 50), 'AgeGroup'] = "adults (>16,<= 50)"
-    df.loc[df['Age'] > 50, 'AgeGroup'] = "elderly (>50)"
-    df['AgeGroup'] = df['AgeGroup'].astype('category')
+    bins = (-1, 16, 50, 100)
+    age_groups = ["kids (<=16)", "adults (>16,<= 50)", "elderly (>50)"]
+    age_group_col = pd.cut(df.Age, bins, labels=age_groups)
+    df['AgeGroup'] = age_group_col.astype('category')
 
 def add_title(df):
     df['Title'] = df['Name'].str.extract('([A-Za-z]+)\.', expand=False)
@@ -194,6 +192,7 @@ def update_features(src_df, dst_df):
     add_title(dst_df)
     impute_age(src_df, dst_df)
     add_age_group(dst_df)
+
     impute_embarked(src_df, dst_df)
     impute_fare(src_df, dst_df)    
     add_is_alone(dst_df)
@@ -230,7 +229,7 @@ def onehot_categories(df):
     Apply one-hot encoding to all categorical columns.
     Some sklearn models don't deal with categories.
     E.g. As of Jan 2018, even random forest implementation converts enums
-      to floats. tps://github.com/scikit-learn/scikit-learn/pull/4899
+      to floats. https://github.com/scikit-learn/scikit-learn/pull/4899
     @param df (DataFrame).
     @return df new pd with categorical columns replaced with binaries.
     """
