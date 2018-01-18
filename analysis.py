@@ -11,6 +11,7 @@ import seaborn as sea
 import sys
 
 # Machine learning
+from sklearn import preprocessing
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
@@ -198,15 +199,22 @@ def update_features(src_df, dst_df):
     # Title needed for age imputation
     add_title(src_df)
     add_title(dst_df)
+    impute_age(src_df, src_df)
     impute_age(src_df, dst_df)
     add_age_group(dst_df)
 
     impute_embarked(src_df, dst_df)
     impute_fare(src_df, dst_df)    
     add_is_alone(dst_df)
+    
     dst_df['Pclass'] = dst_df['Pclass'].astype('category')
     dst_df['Embarked'] = dst_df['Embarked'].astype('category')
     dst_df['Sex'] = dst_df['Sex'].astype('category')
+    
+    # Scaling
+    features_to_scale = ['Age', 'Fare']
+    scaler = preprocessing.StandardScaler().fit(src_df[features_to_scale])
+    dst_df[features_to_scale] = scaler.transform(dst_df[features_to_scale])
     
     # Select features
     dst_df = dst_df[[
