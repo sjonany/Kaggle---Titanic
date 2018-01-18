@@ -315,12 +315,41 @@ def gen_models():
         "Random forest": RandomForestClassifier(n_estimators=50,
                                                 max_features=2,
                                                 random_state=RANDOM_STATE),
-        # TODO: hyperparam tune                                                
-        "Xgboost": xgb.XGBClassifier(max_depth=3,
-                                     n_estimators=300,
-                                     learning_rate=0.05),
+        # See grid_search_xgboost()                                                
+        "Xgboost": xgb.XGBClassifier(
+                colsample_bytree = 0.75,
+                subsample = 0.5,
+                max_depth = 10,
+                n_estimators = 1000,
+                learning_rate = 0.01,
+                seed=RANDOM_STATE),
         }
     return models
+
+def grid_search_xgboost(features, labels):
+    """
+    Grid search on xgboost.
+    Jan 18, 2018
+    Out: Best parameters set found on development set:
+    {'colsample_bytree': 0.75, 'learning_rate': 0.01, 'max_depth': 10,
+     'n_estimators': 1000, 'subsample': 0.5}
+    
+    @param features, labels. X,Y of training set.
+    """
+    boost_params = {'n_estimators': [100,500,1000],
+                    'learning_rate': [0.1, 0.01, 0.001],
+                    'subsample': [0.5], # [0.5, 0.75, 1.0],
+                    'colsample_bytree': [0.75], # [0.5, 0.75, 1.0],
+                    # I think this is 'min leaf weight', but Idk how to tune.
+                    # 'min_child_weight': 
+                    'max_depth': [10]}# [4, 6, 8, 10]}
+    cv_model = GridSearchCV(\
+                xgb.XGBClassifier( \
+                        seed=RANDOM_STATE), boost_params, cv=5,\
+                       scoring='accuracy', verbose=10)
+    cv_model.fit(features, labels)
+    print("Best parameters set found on development set:")
+    print(cv_model.best_params_)
 
 def grid_search_forest(features, labels):
     """
@@ -335,7 +364,6 @@ def grid_search_forest(features, labels):
     Out: Best parameters set found on development set:
         {'max_features': 2, 'n_estimators': 50}
     
-    @param models (Map<string, model>) Models to evaluate.
     @param features, labels. X,Y of training set.
     """
     forest_params = {'n_estimators': [25, 50, 100, 250, 500],
@@ -397,13 +425,13 @@ models = gen_models()
 
 # Enable if you want to tune hyperparams.
 """
-grid_search_forest(train_reduced_features, train_labels)
+grid_search_xgboost(train_features, train_labels)
 sys.exit()
 """
 
 evaluate_models(models, KFOLD, train_features, train_labels)
 
 # Final training and prediction
-final_model = models['Random forest']
+final_model = models['Xgboost']
 write_submission(final_model, train_features, train_labels,
                  test_features, raw_test_df["PassengerId"])
