@@ -17,6 +17,7 @@ from sklearn.feature_selection import SelectFromModel
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+import xgboost as xgb
 
 TRAIN_PATH = "data/train.csv"
 TEST_PATH = "data/test.csv"
@@ -164,7 +165,7 @@ def impute_fare(src_df, dst_df):
 
 def add_age_group(df):
     bins = (-1, 16, 50, 100)
-    age_groups = ["kids (<=16)", "adults (>16,<= 50)", "elderly (>50)"]
+    age_groups = ["kids_le16", "adults_g16_le50)", "elderly_g50"]
     age_group_col = pd.cut(df.Age, bins, labels=age_groups)
     df['AgeGroup'] = age_group_col.astype('category')
 
@@ -313,7 +314,11 @@ def gen_models():
         # See grid_search_forest()
         "Random forest": RandomForestClassifier(n_estimators=50,
                                                 max_features=2,
-                                                random_state=RANDOM_STATE)
+                                                random_state=RANDOM_STATE),
+        # TODO: hyperparam tune                                                
+        "Xgboost": xgb.XGBClassifier(max_depth=3,
+                                     n_estimators=300,
+                                     learning_rate=0.05),
         }
     return models
 
