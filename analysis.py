@@ -25,7 +25,7 @@ RANDOM_STATE = 123
 #####################
 # Analysis tools
 
-def printDiscreteStats(df, colName):
+def print_discrete_stats(df, colName):
     """
     Print tally for column, and see relationship against label.
     The label is hardcoded to 'Survived'.
@@ -39,9 +39,17 @@ def printDiscreteStats(df, colName):
                 by=[('Survived', 'mean')],
                 ascending=False))
 
+def print_hist(arr):
+    """
+    Draw histogram to show distribution of arr
+    @param arr (1D Dataframe) - an array of real numbers
+    """
+    plt.hist(arr, bins=20)
+    plt.axvline(arr.mean(), color='b', linestyle='dashed', linewidth=2)
+
 #####################
 # Understand the data
-def printPrelimAnalysis(df):
+def print_prelim_analysis(df):
     """
     Preliminary analysis. Just visualizations before we wrangle anything.
     @param df (dataframe)
@@ -243,6 +251,19 @@ def onehot_categories(df):
     dummied_pd.drop(cat_cols, axis=1, inplace=True)
     return dummied_pd
 
+def get_selective_features(features, labels):
+    """
+    Get feature names that are important.
+    Importance is evaluated by fitting tree to the training set.
+    @param features (DataFrame)
+    @param labels (DataFrame)
+    @return list<string> the feature names
+    """
+    clf = ExtraTreesClassifier(random_state=RANDOM_STATE)
+    clf = clf.fit(features, labels)
+    feature_select_model = SelectFromModel(clf, prefit=True)
+    return features.columns[feature_select_model.get_support()]
+
 #####################
 # Model generation and evalution
 
@@ -347,12 +368,10 @@ test_features = onehot_categories(
 train_labels = raw_train_df["Survived"]
 
 # Auto feature selection
-clf = ExtraTreesClassifier(random_state=RANDOM_STATE)
-clf = clf.fit(train_features, train_labels)
-feature_select_model = SelectFromModel(clf, prefit=True)
-reduced_cols = train_features.columns[feature_select_model.get_support()]
-train_reduced_features = train_features[reduced_cols]
-test_reduced_features = test_features[reduced_cols]
+"""
+Enable if you want to see feature selection
+features = get_selective_features(train_features, train_labels)
+"""
 
 # Enable if you want to see variable importance
 """
@@ -369,9 +388,9 @@ grid_search_forest(train_reduced_features, train_labels)
 sys.exit()
 """
 
-evaluate_models(models, KFOLD, train_reduced_features, train_labels)
+evaluate_models(models, KFOLD, train_features, train_labels)
 
 # Final training and prediction
 final_model = models['Random forest']
-write_submission(final_model, train_reduced_features, train_labels,
-                 test_reduced_features, raw_test_df["PassengerId"])
+write_submission(final_model, train_features, train_labels,
+                 test_features, raw_test_df["PassengerId"])
