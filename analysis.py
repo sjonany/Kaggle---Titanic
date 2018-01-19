@@ -104,23 +104,31 @@ def print_prelim_analysis(df):
     g.map(sea.barplot, 'Sex', 'Fare', alpha=.5, ci=None)
 
 """
-Plot variable importance by training decisision tree.
+Plot variable importance by training decision tree.
 @param X (DataFrame). The feature set.
 @param y (DataFrame). The labels.
 """
 def plot_variable_importance( X , y ):
-    max_num_features = 20
     model = DecisionTreeClassifier()
     model.fit( X , y )
+    plot_model_variable_importance( X, model )
+    print ("Tree model score on training set: {0}".format(
+            model.score( X , y )))
+
+"""
+Plot variable importance of a trained model.
+@param X (DataFrame). The feature set.
+@param model (Model). The trained model
+"""
+def plot_model_variable_importance(X, model):
+    max_num_features = 20
     imp = pd.DataFrame( 
         model.feature_importances_  , 
-        columns = [ 'Importance' ] , 
-        index = X.columns 
+        columns = [ 'Importance' ] ,
+        index = X.columns
     )
     imp = imp.sort_values( [ 'Importance' ] , ascending = True )
     imp[ : max_num_features ].plot( kind = 'barh' )
-    print ("Tree model score on training set: {0}".format(
-            model.score( X , y )))
 
 #####################
 # Data wrangling
@@ -274,10 +282,9 @@ def get_selective_features(features, labels):
     feature_select_model = SelectFromModel(clf, prefit=True)
     return features.columns[feature_select_model.get_support()]
 
-def get_ensemble_preds(model, x_train, y_train, x_test, nfold):
+def get_ensemble_feat(model, x_train, y_train, x_test, nfold):
     """
-    Generate 1 extra column to be added to x_train and x_test.
-    The extra column contains predictions made by model.
+    Generate 1 column that contains predictions made by model.
     The model is trained on folds that don't contain the data point to predict
     on.
     @param model (Model)
@@ -299,6 +306,25 @@ def get_ensemble_preds(model, x_train, y_train, x_test, nfold):
     model.fit(x_train, y_train)
     ensemble_test_col = model.predict(x_test)
     return (ensemble_train_col, ensemble_test_col)
+
+def get_ensemble_feats(models, x_train, y_train, x_test, nfold):
+    """
+    Apply get_ensemble_feat() to all the models to obtain the second-layer
+    feature sets.
+    @param models (Map<String, Model>) First-layer models
+    @return (Dataframe, Dataframe) - the ensemble x_train and x_test
+    """
+    # Map <String model, list<prediction>>
+    ensemble_train_feats = {}
+    ensemble_test_feats = {}
+    for model_name in models:
+        x_train_col, x_test_col = get_ensemble_feat(
+                models[model_name], x_train, y_train, x_test, nfold)
+        ensemble_train_feats[model_name] = x_train_col
+        ensemble_test_feats[model_name] = x_test_col
+    return pd.DataFrame(data=ensemble_train_feats), \
+           pd.DataFrame(data=ensemble_test_feats)
+        
 
 #####################
 # Model generation and evalution
@@ -353,6 +379,22 @@ def gen_models():
         }
     return models
 
+def gen_second_layer_model():
+    """
+    Create the second layer model that will be trained on first-layer model's
+    outputs.
+    
+    @return Model
+    """
+    # Tuned using grid_search_xgboost
+    return xgb.XGBClassifier(
+                colsample_bytree = 0.75,
+                subsample = 0.5,
+                max_depth = 1,
+                n_estimators = 100,
+                learning_rate = 0.01,
+                seed=RANDOM_STATE)
+
 def grid_search_xgboost(features, labels):
     """
     Grid search on xgboost.
@@ -361,15 +403,19 @@ def grid_search_xgboost(features, labels):
     {'colsample_bytree': 0.75, 'learning_rate': 0.01, 'max_depth': 10,
      'n_estimators': 1000, 'subsample': 0.5}
     
+    Out: Best params on ensemble set:
+    {'colsample_bytree': 0.75, 'learning_rate': 0.01, 'max_depth': 1, 
+    n_estimators': 100, 'subsample': 0.5}        
+        
     @param features, labels. X,Y of training set.
     """
-    boost_params = {'n_estimators': [100,500,1000],
-                    'learning_rate': [0.1, 0.01, 0.001],
-                    'subsample': [0.5], # [0.5, 0.75, 1.0],
+    boost_params = {'n_estimators': [100,500], # [100, 500, 1000]
+                    'learning_rate': [0.1, 0.01], # [0.1, 0.01, 0.001]
+                    'subsample': [0.5, 0.75, 1.0], # [0.5, 0.75, 1.0]
                     'colsample_bytree': [0.75], # [0.5, 0.75, 1.0],
                     # I think this is 'min leaf weight', but Idk how to tune.
                     # 'min_child_weight': 
-                    'max_depth': [10]}# [4, 6, 8, 10]}
+                    'max_depth': [1, 2, 3]}# [4, 6, 8, 10]}
     cv_model = GridSearchCV(\
                 xgb.XGBClassifier( \
                         seed=RANDOM_STATE), boost_params, cv=5,\
@@ -450,20 +496,30 @@ sys.exit()
 # Generate models
 models = gen_models()
 
-"""
-TODO: Attach the ensemble preds and retrain.
-svm_preds = get_ensemble_preds(models["SVM"], train_features, train_labels,
-                   test_features, KFOLD)
-"""
-
-# Enable if you want to tune hyperparams.
+# Enable if you want to tune hyperparams on first layer
 """
 grid_search_xgboost(train_features, train_labels)
 sys.exit()
 """
+
+# Enable if you want to see performance of first layer
 evaluate_models(models, KFOLD, train_features, train_labels)
 
+train_feats_ensemble, test_feats_ensemble = \
+    get_ensemble_feats(models, train_features, train_labels, test_features, \
+                       KFOLD)
+# Enable if you want to tune hyperparams on second layer
+"""
+grid_search_xgboost(train_feats_ensemble, train_labels)
+sys.exit()
+"""
+
+# Enable if you want to see performance of second layer
+final_model = gen_second_layer_model()
+final_models = {"final": final_model}
+evaluate_models(final_models, KFOLD, train_feats_ensemble, train_labels)
+plot_model_variable_importance(train_feats_ensemble, final_model)
+
 # Final training and prediction
-final_model = models['Xgboost']
-write_submission(final_model, train_features, train_labels,
-                 test_features, raw_test_df["PassengerId"])
+write_submission(final_model, train_feats_ensemble, train_labels,
+                 test_feats_ensemble, raw_test_df["PassengerId"])
