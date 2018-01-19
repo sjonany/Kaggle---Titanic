@@ -11,6 +11,7 @@ import seaborn as sea
 import sys
 
 # Machine learning
+import numpy as np
 from sklearn import preprocessing
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
@@ -273,6 +274,32 @@ def get_selective_features(features, labels):
     feature_select_model = SelectFromModel(clf, prefit=True)
     return features.columns[feature_select_model.get_support()]
 
+def get_ensemble_preds(model, x_train, y_train, x_test, nfold):
+    """
+    Generate 1 extra column to be added to x_train and x_test.
+    The extra column contains predictions made by model.
+    The model is trained on folds that don't contain the data point to predict
+    on.
+    @param model (Model)
+    @param x_train (Dataframe)
+    @param y_train (Dataframe)
+    @param x_test (Dataframe)
+    @param nfold (int) number of folds for generating train cols.
+    @return (1D Dataframe, 1D Dataframe) - the columns to add to x_train and
+      x_test respectively.
+    """
+    ensemble_train_col = pd.Series(np.zeros(x_train.shape[0]))
+    kfold = StratifiedKFold(n_splits=nfold, random_state=RANDOM_STATE)
+    for train_indices, test_indices in kfold.split(x_train, y_train):
+        x_train_fold = x_train.iloc[train_indices,:]
+        y_train_fold = y_train.iloc[train_indices]
+        x_test_fold = x_train.iloc[test_indices,:]
+        model.fit(x_train_fold, y_train_fold)
+        ensemble_train_col[test_indices] = model.predict(x_test_fold)
+    model.fit(x_train, y_train)
+    ensemble_test_col = model.predict(x_test)
+    return (ensemble_train_col, ensemble_test_col)
+
 #####################
 # Model generation and evalution
 
@@ -423,12 +450,17 @@ sys.exit()
 # Generate models
 models = gen_models()
 
+"""
+TODO: Attach the ensemble preds and retrain.
+svm_preds = get_ensemble_preds(models["SVM"], train_features, train_labels,
+                   test_features, KFOLD)
+"""
+
 # Enable if you want to tune hyperparams.
 """
 grid_search_xgboost(train_features, train_labels)
 sys.exit()
 """
-
 evaluate_models(models, KFOLD, train_features, train_labels)
 
 # Final training and prediction
