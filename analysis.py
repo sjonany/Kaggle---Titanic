@@ -112,23 +112,28 @@ def plot_variable_importance( X , y ):
     model = DecisionTreeClassifier()
     model.fit( X , y )
     plot_model_variable_importance( X, model )
+    
     print ("Tree model score on training set: {0}".format(
             model.score( X , y )))
 
 """
 Plot variable importance of a trained model.
-@param X (DataFrame). The feature set.
+@param X (DataFrame). The feature set
 @param model (Model). The trained model
+@param title (string). Title of the plot
 """
-def plot_model_variable_importance(X, model):
+def plot_model_variable_importance(X, model, title=""):
+    if not hasattr(model, 'feature_importances_'):
+        return
+    feature_importances = model.feature_importances_
     max_num_features = 20
     imp = pd.DataFrame( 
-        model.feature_importances_  , 
+        feature_importances, 
         columns = [ 'Importance' ] ,
         index = X.columns
     )
     imp = imp.sort_values( [ 'Importance' ] , ascending = True )
-    imp[ : max_num_features ].plot( kind = 'barh' )
+    imp[ : max_num_features ].plot( kind='barh', title=title )
     
 def plot_pearson(df):
     """
@@ -369,6 +374,8 @@ def evaluate_models(models, nfold, features, labels):
             total_score += cur_score
             print("Model {0}. Acc {1}".format(model_name, cur_score))
         model_scores[model_name] = total_score / nfold
+        plot_model_variable_importance(features, models[model_name],
+                                       title=model_name)
     
     desc_score_models = sorted(model_scores, key=model_scores.get, reverse=True)
     for model in desc_score_models:
@@ -544,10 +551,8 @@ final_model = gen_second_layer_model()
 """
 final_models = {"final": final_model}
 evaluate_models(final_models, KFOLD, train_feats_ensemble, train_labels)
-plot_model_variable_importance(train_feats_ensemble, final_model)
 sys.exit()
 """
-
 # Final training and prediction
 write_submission(final_model, train_feats_ensemble, train_labels,
                  test_feats_ensemble, raw_test_df["PassengerId"])
