@@ -129,6 +129,19 @@ def plot_model_variable_importance(X, model):
     )
     imp = imp.sort_values( [ 'Importance' ] , ascending = True )
     imp[ : max_num_features ].plot( kind = 'barh' )
+    
+def plot_pearson(df):
+    """
+    Plot pearson correlation for a dataframe.
+    Useful to see if all the any of the features are redundant.
+    Or in general, another way to sanity check the features.
+    @param df (DataFrame) The entire training dataframe (including label).
+    """
+    colormap = plt.cm.RdBu
+    plt.figure(figsize=(14,12))
+    plt.title('Pearson Correlation of Features', y=1.05, size=15)
+    sea.heatmap(df.astype(float).corr(),linewidths=0.1,vmax=1.0, 
+            square=True, cmap=colormap, linecolor='white', annot=True)
 
 #####################
 # Data wrangling
@@ -486,15 +499,18 @@ test_features = onehot_categories(
         update_features(raw_train_df, test_df))
 train_labels = raw_train_df["Survived"]
 
-# Auto feature selection
+
+# Enable if you want to see feature selection
 """
-Enable if you want to see feature selection
 features = get_selective_features(train_features, train_labels)
+print(features)
+sys.exit()
 """
 
-# Enable if you want to see variable importance
+# Enable if you want to cross-check the features.
 """
 plot_variable_importance(train_features, train_labels)
+plot_pearson(pd.concat([train_features, train_labels]))
 sys.exit()
 """
 
