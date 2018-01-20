@@ -194,6 +194,9 @@ def add_is_alone(df):
     df['IsAlone'] = 0
     df.loc[family_size_lst == 1, 'IsAlone'] = 1
     
+def add_has_cabin(df):
+    df['HasCabin'] = df['Cabin'].apply(lambda x: type(x) == float) 
+    
 def update_features(src_df, dst_df):
     """
     Drop, add, modify columns. To be applied on both training and test set.
@@ -216,6 +219,7 @@ def update_features(src_df, dst_df):
     impute_embarked(src_df, dst_df)
     impute_fare(src_df, dst_df)    
     add_is_alone(dst_df)
+    add_has_cabin(dst_df)
     
     dst_df['Pclass'] = dst_df['Pclass'].astype('category')
     dst_df['Embarked'] = dst_df['Embarked'].astype('category')
@@ -232,6 +236,7 @@ def update_features(src_df, dst_df):
             'AgeGroup',
             'Embarked',
             'Fare',
+            'HasCabin',
             'IsAlone',
             'Pclass',
             'Sex',
@@ -489,7 +494,7 @@ features = get_selective_features(train_features, train_labels)
 
 # Enable if you want to see variable importance
 """
-plot_variable_importance(train_reduced_features, train_labels)
+plot_variable_importance(train_features, train_labels)
 sys.exit()
 """
 
@@ -503,7 +508,10 @@ sys.exit()
 """
 
 # Enable if you want to see performance of first layer
+"""
 evaluate_models(models, KFOLD, train_features, train_labels)
+sys.exit()
+"""
 
 train_feats_ensemble, test_feats_ensemble = \
     get_ensemble_feats(models, train_features, train_labels, test_features, \
@@ -514,11 +522,15 @@ grid_search_xgboost(train_feats_ensemble, train_labels)
 sys.exit()
 """
 
-# Enable if you want to see performance of second layer
 final_model = gen_second_layer_model()
+
+# Enable if you want to see performance of second layer
+"""
 final_models = {"final": final_model}
 evaluate_models(final_models, KFOLD, train_feats_ensemble, train_labels)
 plot_model_variable_importance(train_feats_ensemble, final_model)
+sys.exit()
+"""
 
 # Final training and prediction
 write_submission(final_model, train_feats_ensemble, train_labels,
