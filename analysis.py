@@ -104,11 +104,11 @@ def print_prelim_analysis(df):
     g.map(sea.barplot, 'Sex', 'Fare', alpha=.5, ci=None)
 
 def plot_variable_importance( X , y ):
-	"""
-	Plot variable importance by training decision tree.
-	@param X (DataFrame). The feature set.
-	@param y (DataFrame). The labels.
-	"""
+    """
+    Plot variable importance by training decision tree.
+    @param X (DataFrame). The feature set.
+    @param y (DataFrame). The labels.
+    """
     model = DecisionTreeClassifier()
     model.fit( X , y )
     plot_model_variable_importance( X, model )
@@ -117,12 +117,12 @@ def plot_variable_importance( X , y ):
             model.score( X , y )))
 
 def plot_model_variable_importance(X, model, title=""):
-	"""
-	Plot variable importance of a trained model.
-	@param X (DataFrame). The feature set
-	@param model (Model). The trained model
-	@param title (string). Title of the plot
-	"""
+    """
+    Plot variable importance of a trained model.
+    @param X (DataFrame). The feature set
+    @param model (Model). The trained model
+    @param title (string). Title of the plot
+    """
     if not hasattr(model, 'feature_importances_'):
         return
     feature_importances = model.feature_importances_
