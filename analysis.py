@@ -24,6 +24,7 @@ TRAIN_PATH = "data/train.csv"
 TEST_PATH = "data/test.csv"
 KFOLD = 10
 RANDOM_STATE = 123
+LABEL_COL = 'Survived'
 
 #####################
 # Analysis tools
@@ -150,45 +151,42 @@ def plot_pearson(df):
 
 #####################
 # Data wrangling
-def impute_age(src_df, dst_df):
+def impute_age(x):
     """
     Impute missing age values.
-    @param src_df (DataFrame). The data frame to gather statistics from.
-    @return dst_df(DataFrame) The data frames to modify.
+    @param x (DataFrame) - The feature set
     """
     # Impute age based on the median age in the [Sex, Pclass] group
-    for sex in src_df['Sex'].unique():
-        for pclass in src_df['Pclass'].unique():
-            for title in src_df['Title'].unique():
+    for sex in x['Sex'].unique():
+        for pclass in x['Pclass'].unique():
+            for title in x['Title'].unique():
                 # The bitwise operator (instead of 'and') is actually required.
                 # https://stackoverflow.com/a/36922103
                 guess_age =  \
-                    src_df[(src_df['Sex'] == sex) & \
-                       (src_df['Pclass'] == pclass) & \
-                       (src_df['Title'] == title)]['Age'].dropna().median()
-                dst_df.loc[dst_df['Age'].isnull() & \
-                   (dst_df['Sex'] == sex) & \
-                   (dst_df['Pclass'] == pclass) & \
-                   (dst_df['Title'] == title),\
+                    x[(x['Sex'] == sex) & \
+                       (x['Pclass'] == pclass) & \
+                       (x['Title'] == title)]['Age'].dropna().median()
+                x.loc[x['Age'].isnull() & \
+                   (x['Sex'] == sex) & \
+                   (x['Pclass'] == pclass) & \
+                   (x['Title'] == title),\
                  'Age'] = guess_age
 
-def impute_embarked(src_df, dst_df):
+def impute_embarked(x):
     """
     Impute missing embarkation values.
-    @param src_df (DataFrame). The data frame to gather statistics from.
-    @return dst_df (DataFrame) The data frames to modify.
+    @param x (DataFrame) - The feature set
     """
-    freq_port = src_df.Embarked.dropna().mode()[0]
-    dst_df['Embarked'].fillna(freq_port, inplace=True)
+    freq_port = x.Embarked.dropna().mode()[0]
+    x['Embarked'].fillna(freq_port, inplace=True)
 
-def impute_fare(src_df, dst_df):
+def impute_fare(x):
     """
     Impute missing fare values.
     The train set is complete, but test set has 1 missing value.
-    @param src_df (DataFrame). The data frame to gather statistics from.
-    @return dst_df (DataFrame) The data frames to modify.
+    @param x (DataFrame) - The feature set
     """
-    dst_df['Fare'].fillna(src_df['Fare'].dropna().median(), inplace=True)
+    x['Fare'].fillna(x['Fare'].dropna().median(), inplace=True)
 
 def add_age_group(df):
     bins = (-1, 16, 50, 100)
@@ -215,41 +213,36 @@ def add_is_alone(df):
 def add_has_cabin(df):
     df['HasCabin'] = df['Cabin'].apply(lambda x: type(x) == float) 
     
-def update_features(src_df, dst_df):
+def process_features(x):
     """
-    Drop, add, modify columns. To be applied on both training and test set.
+    Drop, add, modify columns.
     This form is not dependent on the learning model, and is also a friendly
     format to do plots and analyses on, as the enums are in legible forms.
     So, more processing like 'onehot_categories' might be needed.
-    @param src_df (DataFrame). The data frame to gather statistics from.
-    @param dst_df (DataFrame) The data frames to modify.
-    @return dst_df The updated dst_df.
-    Side-effect - Will modify dst_df, but you have to reassign with the return
-    value. Idk how to select columns and mutate dst_df :/
+    @param x (DataFrame). The combined feature set of train and test.
+    @return DataFrame The updated dataframe.
     """
     # Title needed for age imputation
-    add_title(src_df)
-    add_title(dst_df)
-    impute_age(src_df, src_df)
-    impute_age(src_df, dst_df)
-    add_age_group(dst_df)
+    add_title(x)
+    impute_age(x)
+    add_age_group(x)
 
-    impute_embarked(src_df, dst_df)
-    impute_fare(src_df, dst_df)    
-    add_is_alone(dst_df)
-    add_has_cabin(dst_df)
+    impute_embarked(x)
+    impute_fare(x)    
+    add_is_alone(x)
+    add_has_cabin(x)
     
-    dst_df['Pclass'] = dst_df['Pclass'].astype('category')
-    dst_df['Embarked'] = dst_df['Embarked'].astype('category')
-    dst_df['Sex'] = dst_df['Sex'].astype('category')
+    x['Pclass'] = x['Pclass'].astype('category')
+    x['Embarked'] = x['Embarked'].astype('category')
+    x['Sex'] = x['Sex'].astype('category')
     
     # Scaling
     features_to_scale = ['Age', 'Fare']
-    scaler = preprocessing.StandardScaler().fit(src_df[features_to_scale])
-    dst_df[features_to_scale] = scaler.transform(dst_df[features_to_scale])
+    scaler = preprocessing.StandardScaler().fit(x[features_to_scale])
+    x[features_to_scale] = scaler.transform(x[features_to_scale])
     
     # Select features
-    dst_df = dst_df[[
+    return x[[
             'Age',
             'AgeGroup',
             'Embarked',
@@ -260,7 +253,6 @@ def update_features(src_df, dst_df):
             'Sex',
             'Title'
             ]].copy()
-    return dst_df
 
 def numerize_categories(df):    
     """
@@ -495,29 +487,31 @@ def write_submission(model, train_features, train_labels, test_features,
 """
 Main
 """
-raw_train_df = pd.read_csv(TRAIN_PATH)
-raw_test_df = pd.read_csv(TEST_PATH)
-train_df = raw_train_df.copy()
-test_df = raw_test_df.copy()
+xy_train = pd.read_csv(TRAIN_PATH)
+raw_x_test = pd.read_csv(TEST_PATH)
 
-train_features = onehot_categories(
-        update_features(raw_train_df, train_df))
-test_features = onehot_categories(
-        update_features(raw_train_df, test_df))
-train_labels = raw_train_df["Survived"]
+ntrain = xy_train.shape[0]
+ntest = raw_x_test.shape[0]
+raw_x_train = xy_train.drop(LABEL_COL, axis = 1) 
+y_train = xy_train[LABEL_COL]
+x_all = pd.concat([raw_x_train, raw_x_test])
 
+new_x_all = onehot_categories(process_features(x_all))
+
+x_train = new_x_all.head(ntrain)
+x_test = new_x_all.tail(ntest)
 
 # Enable if you want to see feature selection
 """
-features = get_selective_features(train_features, train_labels)
+features = get_selective_features(x_train, y_train)
 print(features)
 sys.exit()
 """
 
 # Enable if you want to cross-check the features.
 """
-plot_variable_importance(train_features, train_labels)
-plot_pearson(pd.concat([train_features, train_labels]))
+plot_variable_importance(x_train, y_train)
+plot_pearson(pd.concat([x_train, y_train]))
 sys.exit()
 """
 
@@ -526,22 +520,22 @@ models = gen_models()
 
 # Enable if you want to tune hyperparams on first layer
 """
-grid_search_xgboost(train_features, train_labels)
+grid_search_xgboost(x_train, y_train)
 sys.exit()
 """
 
 # Enable if you want to see performance of first layer
 """
-evaluate_models(models, KFOLD, train_features, train_labels)
+evaluate_models(models, KFOLD, x_train, y_train)
 sys.exit()
 """
 
-train_feats_ensemble, test_feats_ensemble = \
-    get_ensemble_feats(models, train_features, train_labels, test_features, \
+x_train_ensemble, x_test_ensemble = \
+    get_ensemble_feats(models, x_train, y_train, x_test, \
                        KFOLD)
 # Enable if you want to tune hyperparams on second layer
 """
-grid_search_xgboost(train_feats_ensemble, train_labels)
+grid_search_xgboost(x_train_ensemble, y_train)
 sys.exit()
 """
 
@@ -550,9 +544,10 @@ final_model = gen_second_layer_model()
 # Enable if you want to see performance of second layer
 """
 final_models = {"final": final_model}
-evaluate_models(final_models, KFOLD, train_feats_ensemble, train_labels)
+evaluate_models(final_models, KFOLD, x_train_ensemble, y_train)
 sys.exit()
 """
+
 # Final training and prediction
-write_submission(final_model, train_feats_ensemble, train_labels,
-                 test_feats_ensemble, raw_test_df["PassengerId"])
+write_submission(final_model, x_train_ensemble, y_train,
+                 x_test_ensemble, raw_x_test["PassengerId"])
